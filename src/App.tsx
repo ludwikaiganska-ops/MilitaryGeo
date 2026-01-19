@@ -1,7 +1,7 @@
 import { MapContainer, TileLayer } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 // Importujemy Twój nowy komponent (Krok 9)
-import MilitaryOSMLayer from "./MilitaryLayer";
+import MilitaryOSMLayer from "./MilitaryOSMLayer";
 
 export default function App() {
   // Współrzędne początkowe (środek Polski)
