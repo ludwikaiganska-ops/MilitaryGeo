@@ -1,8 +1,8 @@
 import { useEffect, useState, useRef } from "react";
 import { GeoJSON, useMap } from "react-leaflet";
 import L from "leaflet";
+import axios from "axios"; // Importujemy axios do pobierania plików lokalnych
 import { type MilitaryType, MILITARY_TYPES, MILITARY_LABELS } from "./types";
-import { fetchMilitaryData } from "./overpassService";
 
 export default function MilitaryOSMLayer() {
   const [militaryType, setMilitaryType] = useState<MilitaryType>("barracks");
@@ -13,25 +13,35 @@ export default function MilitaryOSMLayer() {
   const layerRef = useRef<L.GeoJSON | null>(null);
   const map = useMap();
 
-  // Efekt ładowania danych
+  // Efekt ładowania danych z plików LOKALNYCH
   useEffect(() => {
     let isMounted = true;
 
-    const loadData = async () => {
+    const loadLocalData = async () => {
       setLoading(true);
       setError(null);
+      setData(null); // Czyścimy stare dane przed nowym pobieraniem
+
       try {
-        const geojson = await fetchMilitaryData(militaryType);
-        if (isMounted) setData(geojson);
+        // Kierujemy zapytanie do folderu public/data/nazwa_typu.json
+        // Pliki w folderze public są serwowane z głównej ścieżki "/"
+        const response = await axios.get(`/data/${militaryType}.json`);
+        
+        if (isMounted) {
+          setData(response.data);
+        }
       } catch (e) {
-        if (isMounted) setError("Błąd pobierania danych wojskowych.");
+        console.error("Błąd ładowania lokalnego pliku JSON:", e);
+        if (isMounted) {
+          setError(`Nie udało się załadować lokalnych danych dla: ${MILITARY_LABELS[militaryType]}`);
+        }
       } finally {
         if (isMounted) setLoading(false);
       }
     };
 
-    loadData();
-    return () => { isMounted = false; }; // Cleanup, by uniknąć wycieków pamięci
+    loadLocalData();
+    return () => { isMounted = false; };
   }, [militaryType]);
 
   // Efekt dopasowania kamery
@@ -50,7 +60,7 @@ export default function MilitaryOSMLayer() {
       {error && <ErrorBox message={error} />}
       
       <div className="control-panel" style={panelStyle}>
-        <h4 style={{ margin: "0 0 8px 0" }}>Wywiad geograficzny (OSM):</h4>
+        <h4 style={{ margin: "0 0 8px 0" }}>Wywiad geograficzny (Lokalny):</h4>
         {MILITARY_TYPES.map((type) => (
           <button
             key={type}
@@ -78,7 +88,7 @@ export default function MilitaryOSMLayer() {
   );
 }
 
-// --- Style i Mini-komponenty pomocnicze ---
+// --- Style i Mini-komponenty pomocnicze (bez zmian) ---
 
 const panelStyle: React.CSSProperties = {
   position: "absolute", top: "20px", left: "60px", zIndex: 9999,
@@ -97,7 +107,8 @@ const geoJsonStyle = {
 function LoadingOverlay({ label }: { label: string }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 99999, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "white" }}>
-      <div>Ładowanie: {label}...</div>
+      <div style={{ fontSize: "20px", fontWeight: "bold" }}>Ładowanie danych lokalnych...</div>
+      <div style={{ marginTop: "10px" }}>{label}</div>
     </div>
   );
 }
