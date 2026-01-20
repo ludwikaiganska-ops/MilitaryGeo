@@ -1,122 +1,178 @@
+// ---- IMPORTY ----
 import { useEffect, useState, useRef } from "react";
 import { GeoJSON, useMap } from "react-leaflet";
-import L from "leaflet";
-import axios from "axios"; // Importujemy axios do pobierania plików lokalnych
-import { type MilitaryType, MILITARY_TYPES, MILITARY_LABELS } from "./types";
+import axios from "axios";
+import osmtogeojson from "osmtogeojson";
+import L from "leaflet"; // Importujemy Leaflet dla typowania ref
+
+// ---- TYPY ----
+// Uzupełnione o dodatkowe typy wojskowe (TODO)
+type MilitaryType =
+  | "barracks"
+  | "naval_base"
+  | "airfield"
+  | "training_area"
+  | "range"
+  | "danger_area"
+  | "bunker";
+
+type GeoJSONData = GeoJSON.FeatureCollection;
+
+// ---- LISTA TYPÓW ----
+const MILITARY_TYPES: MilitaryType[] = [
+  "barracks",
+  "naval_base",
+  "airfield",
+  "training_area",
+  "range",
+  "danger_area",
+  "bunker"
+];
+
+// ---- ETYKIETY (Tłumaczenia) ----
+const MILITARY_LABELS: Record<MilitaryType, string> = {
+  barracks: "Koszary",
+  naval_base: "Baza morska",
+  airfield: "Lotnisko wojskowe",
+  training_area: "Obszar ćwiczeń",
+  range: "Poligon",
+  danger_area: "Strefa niebezpieczna",
+  bunker: "Bunkier"
+};
 
 export default function MilitaryOSMLayer() {
+  // Stan dla wybranego typu i danych (TODO: dodano typowanie)
   const [militaryType, setMilitaryType] = useState<MilitaryType>("barracks");
-  const [data, setData] = useState<GeoJSON.FeatureCollection | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [data, setData] = useState<GeoJSONData | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   const layerRef = useRef<L.GeoJSON | null>(null);
   const map = useMap();
 
-  // Efekt ładowania danych z plików LOKALNYCH
+  // ---- FUNKCJA POBIERANIA DANYCH ----
+  const fetchData = async (type: MilitaryType) => {
+    setLoading(true); // Wyświetlamy loader (TODO)
+    setError(null);
+    setData(null);
+
+    // Zapytanie Overpass (Możesz zmienić "PL" na "DE" aby sprawdzić Niemcy)
+    const query = `
+    [out:json][timeout:60];
+    area["ISO3166-1"="PL"]->.a;
+    (
+      way["military"="${type}"](area.a);
+      relation["military"="${type}"](area.a);
+      node["military"="${type}"](area.a);
+    );
+    out geom;
+    `;
+
+    const requestUrl = "https://overpass.kumi.systems/api/interpreter?data=" + encodeURIComponent(query);
+
+    try {
+      // Wykorzystanie axios (TODO)
+      const res = await axios.get(requestUrl);
+      
+      // Konwersja OSM do GeoJSON (TODO)
+      const geojson = osmtogeojson(res.data) as GeoJSONData;
+      
+      setData(geojson);
+    } catch (e) {
+      console.error("Błąd Overpass:", e);
+      setError("Nie udało się pobrać danych wojskowych.");
+      setData(null);
+    } finally {
+      setLoading(false); // Ukrywamy loader (TODO)
+    }
+  };
+
   useEffect(() => {
-    let isMounted = true;
-
-    const loadLocalData = async () => {
-      setLoading(true);
-      setError(null);
-      setData(null); // Czyścimy stare dane przed nowym pobieraniem
-
-      try {
-        // Kierujemy zapytanie do folderu public/data/nazwa_typu.json
-        // Pliki w folderze public są serwowane z głównej ścieżki "/"
-        const response = await axios.get(`/data/${militaryType}.json`);
-        
-        if (isMounted) {
-          setData(response.data);
-        }
-      } catch (e) {
-        console.error("Błąd ładowania lokalnego pliku JSON:", e);
-        if (isMounted) {
-          setError(`Nie udało się załadować lokalnych danych dla: ${MILITARY_LABELS[militaryType]}`);
-        }
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
-
-    loadLocalData();
-    return () => { isMounted = false; };
+    fetchData(militaryType);
   }, [militaryType]);
 
-  // Efekt dopasowania kamery
+  // ---- DOPASOWANIE WIDOKU ----
   useEffect(() => {
-    if (data && layerRef.current) {
-      const bounds = layerRef.current.getBounds();
-      if (bounds.isValid()) {
-        map.fitBounds(bounds, { animate: true, padding: [20, 20] });
-      }
+    if (!data || !layerRef.current) return;
+    const bounds = layerRef.current.getBounds();
+    if (bounds.isValid()) {
+      map.fitBounds(bounds, { animate: true, padding: [20, 20] });
     }
   }, [data, map]);
 
   return (
     <>
-      {loading && <LoadingOverlay label={MILITARY_LABELS[militaryType]} />}
-      {error && <ErrorBox message={error} />}
-      
-      <div className="control-panel" style={panelStyle}>
-        <h4 style={{ margin: "0 0 8px 0" }}>Wywiad geograficzny (Lokalny):</h4>
+      {/* ---- LOADER ---- */}
+      {loading && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
+          background: "rgba(0,0,0,0.6)", zIndex: 99999, display: "flex",
+          flexDirection: "column", alignItems: "center", justifyContent: "center",
+          color: "white", fontSize: "24px", fontWeight: "bold"
+        }}>
+          <div>Ładowanie danych: {MILITARY_LABELS[militaryType]}...</div>
+          <div style={{ fontSize: "14px", marginTop: "10px" }}>To może potrwać kilka sekund</div>
+        </div>
+      )}
+
+      {/* ---- KOMUNIKAT BŁĘDU ---- */}
+      {error && (
+        <div style={{
+          position: "absolute", bottom: "40px", left: "50%", transform: "translateX(-50%)",
+          zIndex: 10000, background: "#ff5252", color: "white", padding: "10px 20px", borderRadius: "20px"
+        }}>
+          {error}
+        </div>
+      )}
+
+      {/* ---- PANEL PRZYCISKÓW ---- */}
+      <div style={{
+        position: "absolute", top: "20px", left: "60px", // Przesunięte, by nie zasłaniać zoomu (TODO)
+        zIndex: 9999, background: "rgba(255,255,255,0.9)", padding: "12px",
+        borderRadius: "8px", boxShadow: "0 2px 10px rgba(0,0,0,0.3)", maxWidth: "300px"
+      }}>
+        <div style={{ fontWeight: "bold", marginBottom: "8px", color: "#333" }}>
+          Wywiad geograficzny (OSM):
+        </div>
         {MILITARY_TYPES.map((type) => (
           <button
             key={type}
+            title={`Pobierz obiekty typu: ${type}`} // Tooltip (TODO)
             onClick={() => setMilitaryType(type)}
-            style={getButtonStyle(type === militaryType)}
+            style={{
+              margin: "3px", padding: "8px 12px", borderRadius: "4px",
+              border: "none", cursor: "pointer", fontSize: "12px",
+              background: type === militaryType ? "#1b5e20" : "#e0e0e0",
+              color: type === militaryType ? "#fff" : "#000",
+              transition: "0.3s"
+            }}
           >
-            {MILITARY_LABELS[type]}
+            {MILITARY_LABELS[type] || type}
           </button>
         ))}
       </div>
 
+      {/* ---- WARSTWA GEOJSON ---- */}
       {data && (
         <GeoJSON
           key={militaryType}
           data={data}
           ref={layerRef}
-          style={geoJsonStyle}
+          style={() => ({
+            color: "#c62828", // Ciemna czerwień wojskowa
+            weight: 3,
+            opacity: 0.8,
+            fillColor: "#ff5252",
+            fillOpacity: 0.35,
+          })}
           onEachFeature={(feature, layer) => {
-            const name = feature.properties?.name || "Obiekt bezimienny";
-            layer.bindPopup(`<strong>${name}</strong><br/>Typ: ${MILITARY_LABELS[militaryType]}`);
+            // Dodajemy popup z informacją o nazwie obiektu
+            if (feature.properties && feature.properties.name) {
+              layer.bindPopup(`<strong>${feature.properties.name}</strong><br/>Typ: ${militaryType}`);
+            }
           }}
         />
       )}
     </>
-  );
-}
-
-// --- Style i Mini-komponenty pomocnicze (bez zmian) ---
-
-const panelStyle: React.CSSProperties = {
-  position: "absolute", top: "20px", left: "60px", zIndex: 9999,
-  background: "white", padding: "12px", borderRadius: "8px", boxShadow: "0 2px 10px rgba(0,0,0,0.3)"
-};
-
-const getButtonStyle = (isActive: boolean): React.CSSProperties => ({
-  margin: "3px", padding: "8px 12px", borderRadius: "4px", border: "none", cursor: "pointer",
-  background: isActive ? "#1b5e20" : "#e0e0e0", color: isActive ? "#fff" : "#000"
-});
-
-const geoJsonStyle = {
-  color: "#c62828", weight: 3, opacity: 0.8, fillColor: "#ff5252", fillOpacity: 0.35
-};
-
-function LoadingOverlay({ label }: { label: string }) {
-  return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 99999, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: "white" }}>
-      <div style={{ fontSize: "20px", fontWeight: "bold" }}>Ładowanie danych lokalnych...</div>
-      <div style={{ marginTop: "10px" }}>{label}</div>
-    </div>
-  );
-}
-
-function ErrorBox({ message }: { message: string }) {
-  return (
-    <div style={{ position: "absolute", bottom: "40px", left: "50%", transform: "translateX(-50%)", zIndex: 10000, background: "#ff5252", color: "white", padding: "10px 20px", borderRadius: "20px" }}>
-      {message}
-    </div>
   );
 }
