@@ -1,8 +1,8 @@
 // ---- IMPORTY ----
 import { useEffect, useState, useRef } from "react";
 import { GeoJSON, useMap } from "react-leaflet";
-import axios from "axios";
-import osmtogeojson from "osmtogeojson";
+//import axios from "axios";
+//import osmtogeojson from "osmtogeojson";
 import L from "leaflet"; // Importujemy Leaflet dla typowania ref
 
 // ---- TYPY ----
@@ -52,38 +52,26 @@ export default function MilitaryOSMLayer() {
 
   // ---- FUNKCJA POBIERANIA DANYCH ----
   const fetchData = async (type: MilitaryType) => {
-    setLoading(true); // Wyświetlamy loader (TODO)
-    setError(null);
+    setLoading(true); 
     setData(null);
+    setError(null);
 
-    // Zapytanie Overpass (Możesz zmienić "PL" na "DE" aby sprawdzić Niemcy)
-    const query = `
-    [out:json][timeout:60];
-    area["ISO3166-1"="PL"]->.a;
-    (
-      way["military"="${type}"](area.a);
-      relation["military"="${type}"](area.a);
-      node["military"="${type}"](area.a);
-    );
-    out geom;
-    `;
-
-    const requestUrl = "https://overpass.kumi.systems/api/interpreter?data=" + encodeURIComponent(query);
-
+    const url = `/data/${type}.json`;
+    
     try {
-      // Wykorzystanie axios (TODO)
-      const res = await axios.get(requestUrl);
+      const result = await fetch(url);
       
-      // Konwersja OSM do GeoJSON (TODO)
-      const geojson = osmtogeojson(res.data) as GeoJSONData;
-      
+      if (!result.ok) {
+        throw new Error(`Nie znaleziono pliku: ${url}`);
+      }
+
+      const geojson = await result.json();
       setData(geojson);
-    } catch (e) {
-      console.error("Błąd Overpass:", e);
-      setError("Nie udało się pobrać danych wojskowych.");
-      setData(null);
+    } catch (error) {
+      console.error("Błąd podczas pobierania danych:", error);
+      setError("Nie udało się załadować danych lokalnych.");
     } finally {
-      setLoading(false); // Ukrywamy loader (TODO)
+      setLoading(false);
     }
   };
 
