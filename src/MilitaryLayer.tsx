@@ -159,7 +159,7 @@ export default function MilitaryOSMLayer() {
               layer.bindPopup(`<strong>${feature.properties.name}</strong><br/>Typ: ${militaryType}`);
             }
           }}
-        />
+        /> 
       )}
     </>
   );
