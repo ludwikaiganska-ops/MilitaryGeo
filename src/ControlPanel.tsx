@@ -24,12 +24,12 @@ export default function ControlPanel({ types, labels, activeType, activeColor, o
             onClick={() => onSelect(type)}
           />
         ))}
+        {/* Przycisk 'Wszystkie' jest teraz identycznie zdefiniowany co reszta */}
         <Button
           label="Pokaż wszystkie warstwy naraz"
           isActive={activeType === "all"}
           activeColor={activeColor}
           onClick={onShowAll}
-          className="all-layers-btn"
         />
       </div>
     </div>

@@ -7,12 +7,14 @@
   padding: 15px;
   border-radius: 12px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
-  max-width: 85vw; /* Podłużny kształt na górze mapy */
+  /* Pozwalamy panelowi być tak szerokim, jak wymagają tego przyciski w rzędzie */
+  max-width: calc(100vw - 120px); 
 }
 
 .panel-title {
   font-weight: bold;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
+  color: #333;
   font-size: 14px;
 }
 
@@ -21,12 +23,5 @@
   flex-direction: row;
   flex-wrap: wrap;
   gap: 8px;
-}
-
-.all-layers-btn {
-  font-weight: bold;
-  border: 1px solid rgba(0,0,0,0.1);
-  /* Standardowy kolor gdy nieaktywny */
-  background: #0d47a1;
-  color: white;
+  align-items: center;
 }
