@@ -1,0 +1,32 @@
+.top-panel {
+  position: absolute;
+  top: 20px;
+  left: 60px;
+  z-index: 999;
+  background: white;
+  padding: 15px;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+  max-width: 85vw; /* Podłużny kształt na górze mapy */
+}
+
+.panel-title {
+  font-weight: bold;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.buttons-container {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.all-layers-btn {
+  font-weight: bold;
+  border: 1px solid rgba(0,0,0,0.1);
+  /* Standardowy kolor gdy nieaktywny */
+  background: #0d47a1;
+  color: white;
+}

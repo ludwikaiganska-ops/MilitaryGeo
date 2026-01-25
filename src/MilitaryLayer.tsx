@@ -1,23 +1,15 @@
 import { useEffect, useState, useRef } from "react";
 import { GeoJSON, useMap } from "react-leaflet";
 import L from "leaflet";
+
+// Importy Twoich nowych komponentów
 import Legend from "./legend";
 import StyleEditor from "./StyleEditor";
-import "./MilitaryLayer.css"; 
+import ControlPanel from "./ControlPanel";
 
-// ---- TYPY (Naprawia błędy z obrazka) ----
-type MilitaryType =
-  | "barracks"
-  | "naval_base"
-  | "airfield"
-  | "training_area"
-  | "range"
-  | "danger_area"
-  | "bunker";
+// ---- TYPY I STAŁE ----
+type MilitaryType = "barracks" | "naval_base" | "airfield" | "training_area" | "range" | "danger_area" | "bunker";
 
-type GeoJSONData = GeoJSON.FeatureCollection;
-
-// ---- STAŁE (Naprawia błędy z obrazka) ----
 const MILITARY_TYPES: MilitaryType[] = [
   "barracks", "naval_base", "airfield", "training_area", "range", "danger_area", "bunker"
 ];
@@ -34,12 +26,11 @@ const MILITARY_LABELS: Record<MilitaryType, string> = {
 
 export default function MilitaryLayer() {
   const [militaryType, setMilitaryType] = useState<MilitaryType | "all">("barracks");
-  const [data, setData] = useState<GeoJSONData | null>(null);
-  const [allData, setAllData] = useState<GeoJSONData[]>([]);
+  const [data, setData] = useState<any>(null);
+  const [allData, setAllData] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
   
-  // Stan stylu (Zintegrowany z GeoJSON)
+  // Stan stylu zintegrowany z GeoJSON (Zadanie 2)
   const [geoStyle, setGeoStyle] = useState({
     color: "#ff0000",
     weight: 6,
@@ -51,25 +42,24 @@ export default function MilitaryLayer() {
 
   // Pobieranie pojedynczej warstwy
   const fetchData = async (type: MilitaryType) => {
-    setLoading(true); setData(null); setAllData([]); setError(null);
+    setLoading(true); setData(null); setAllData([]);
     try {
       const result = await fetch(`/data/${type}.json`);
-      if (!result.ok) throw new Error("Błąd sieci");
       const geojson = await result.json();
       setData(geojson);
-    } catch (e) { setError("Błąd ładowania danych."); }
+    } catch (e) { console.error("Błąd ładowania"); }
     finally { setLoading(false); }
   };
 
-  // Pobieranie wszystkich warstw (Krok 3)
+  // Pobieranie wszystkich warstw naraz (Zadanie 3)
   const fetchAllData = async () => {
-    setLoading(true); setData(null); setError(null);
+    setLoading(true); setData(null);
     setMilitaryType("all");
     try {
       const promises = MILITARY_TYPES.map(type => fetch(`/data/${type}.json`).then(res => res.json()));
       const results = await Promise.all(promises);
       setAllData(results);
-    } catch (e) { setError("Błąd ładowania wszystkich warstw."); }
+    } catch (e) { console.error("Błąd ładowania wszystkich"); }
     finally { setLoading(false); }
   };
 
@@ -77,7 +67,7 @@ export default function MilitaryLayer() {
     if (militaryType !== "all") fetchData(militaryType);
   }, [militaryType]);
 
-  // Automatyczne przybliżanie do danych
+  // Automatyczne dopasowanie widoku
   useEffect(() => {
     if (!data || !layerRef.current) return;
     const bounds = layerRef.current.getBounds();
@@ -86,32 +76,17 @@ export default function MilitaryLayer() {
 
   return (
     <>
-      {/* Panel Górny */}
-      <div className="top-panel">
-  <div className="panel-title">Wywiad OSM:</div>
-  {MILITARY_TYPES.map((type) => (
-    <button
-      key={type}
-      className={`layer-button ${militaryType === type ? 'active' : ''}`}
-      onClick={() => setMilitaryType(type)}
-      // Dynamiczna zmiana koloru aktywnego przycisku
-      style={militaryType === type ? { backgroundColor: geoStyle.color } : {}}
-    >
-      {MILITARY_LABELS[type]}
-    </button>
-  ))}
-  
-  <button 
-    className={`layer-button all-layers ${militaryType === 'all' ? 'active-all' : ''}`}
-    onClick={fetchAllData}
-    // Dynamiczna zmiana koloru przycisku "Wszystkie"
-    style={militaryType === 'all' ? { backgroundColor: geoStyle.color } : {}}
-  >
-    Pokaż wszystkie warstwy naraz
-  </button>
-</div>
+      {/* Górny panel z przyciskami (Zadanie 3 i 4) */}
+      <ControlPanel 
+        types={MILITARY_TYPES}
+        labels={MILITARY_LABELS}
+        activeType={militaryType}
+        activeColor={geoStyle.color}
+        onSelect={(t) => setMilitaryType(t)}
+        onShowAll={fetchAllData}
+      />
 
-      {/* Warstwy GeoJSON */}
+      {/* Warstwy GeoJSON zintegrowane ze stylem (Zadanie 2) */}
       {militaryType === "all" ? (
         allData.map((layer, idx) => (
           <GeoJSON 
@@ -141,7 +116,7 @@ export default function MilitaryLayer() {
         />
       )}
 
-      {/* Komponenty zewnętrzne */}
+      {/* Legenda (Zadanie 1) */}
       <Legend 
         label={militaryType === "all" ? "Wszystkie" : MILITARY_LABELS[militaryType as MilitaryType]} 
         count={militaryType === "all" 
@@ -149,11 +124,12 @@ export default function MilitaryLayer() {
           : (data?.features?.length || 0)} 
       />
 
+      {/* Edytor stylu (Zadanie 2) */}
       <StyleEditor 
         color={geoStyle.color}
         weight={geoStyle.weight}
         opacity={geoStyle.opacity}
-        onChange={(newVal: any) => setGeoStyle(prev => ({ ...prev, ...newVal }))} 
+        onChange={(newVal) => setGeoStyle(prev => ({ ...prev, ...newVal }))} 
       />
     </>
   );
