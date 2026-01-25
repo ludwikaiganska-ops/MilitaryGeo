@@ -1,0 +1,22 @@
+.custom-button {
+  padding: 8px 16px;
+  cursor: pointer;
+  border: none;
+  border-radius: 6px;
+  background: #f0f0f0; /* Identyczne tło startowe dla wszystkich */
+  font-size: 13px;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  color: #333;
+}
+
+.custom-button:hover {
+  background: #e2e2e2;
+}
+
+/* Styl, gdy przycisk jest aktywny (nadpisujemy kolor tła w TSX) */
+.custom-button.active {
+  color: white;
+  font-weight: bold;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+}

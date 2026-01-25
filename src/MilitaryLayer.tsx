@@ -1,35 +1,19 @@
-// ---- IMPORTY ----
 import { useEffect, useState, useRef } from "react";
 import { GeoJSON, useMap } from "react-leaflet";
-import axios from "axios";
-import osmtogeojson from "osmtogeojson";
-import L from "leaflet"; // Importujemy Leaflet dla typowania ref
+import L from "leaflet";
 
-// ---- TYPY ----
-// Uzupełnione o dodatkowe typy wojskowe (TODO)
-type MilitaryType =
-  | "barracks"
-  | "naval_base"
-  | "airfield"
-  | "training_area"
-  | "range"
-  | "danger_area"
-  | "bunker";
+// Importy Twoich nowych komponentów
+import Legend from "./legend";
+import StyleEditor from "./StyleEditor";
+import ControlPanel from "./ControlPanel";
 
-type GeoJSONData = GeoJSON.FeatureCollection;
+// ---- TYPY I STAŁE ----
+type MilitaryType = "barracks" | "naval_base" | "airfield" | "training_area" | "range" | "danger_area" | "bunker";
 
-// ---- LISTA TYPÓW ----
 const MILITARY_TYPES: MilitaryType[] = [
-  "barracks",
-  "naval_base",
-  "airfield",
-  "training_area",
-  "range",
-  "danger_area",
-  "bunker"
+  "barracks", "naval_base", "airfield", "training_area", "range", "danger_area", "bunker"
 ];
 
-// ---- ETYKIETY (Tłumaczenia) ----
 const MILITARY_LABELS: Record<MilitaryType, string> = {
   barracks: "Koszary",
   naval_base: "Baza morska",
@@ -40,139 +24,113 @@ const MILITARY_LABELS: Record<MilitaryType, string> = {
   bunker: "Bunkier"
 };
 
-export default function MilitaryOSMLayer() {
-  // Stan dla wybranego typu i danych (TODO: dodano typowanie)
-  const [militaryType, setMilitaryType] = useState<MilitaryType>("barracks");
-  const [data, setData] = useState<GeoJSONData | null>(null);
+export default function MilitaryLayer() {
+  const [militaryType, setMilitaryType] = useState<MilitaryType | "all">("barracks");
+  const [data, setData] = useState<any>(null);
+  const [allData, setAllData] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
+  
+  // Stan stylu zintegrowany z GeoJSON (Zadanie 2)
+  const [geoStyle, setGeoStyle] = useState({
+    color: "#ff0000",
+    weight: 6,
+    opacity: 1
+  });
 
   const layerRef = useRef<L.GeoJSON | null>(null);
   const map = useMap();
 
-  // ---- FUNKCJA POBIERANIA DANYCH ----
+  // Pobieranie pojedynczej warstwy
   const fetchData = async (type: MilitaryType) => {
-    setLoading(true); // Wyświetlamy loader (TODO)
-    setError(null);
-    setData(null);
-
-    // Zapytanie Overpass (Możesz zmienić "PL" na "DE" aby sprawdzić Niemcy)
-    const query = `
-    [out:json][timeout:60];
-    area["ISO3166-1"="PL"]->.a;
-    (
-      way["military"="${type}"](area.a);
-      relation["military"="${type}"](area.a);
-      node["military"="${type}"](area.a);
-    );
-    out geom;
-    `;
-
-    const requestUrl = "https://overpass.kumi.systems/api/interpreter?data=" + encodeURIComponent(query);
-
+    setLoading(true); setData(null); setAllData([]);
     try {
-      // Wykorzystanie axios (TODO)
-      const res = await axios.get(requestUrl);
-      
-      // Konwersja OSM do GeoJSON (TODO)
-      const geojson = osmtogeojson(res.data) as GeoJSONData;
-      
+      const result = await fetch(`/data/${type}.json`);
+      const geojson = await result.json();
       setData(geojson);
-    } catch (e) {
-      console.error("Błąd Overpass:", e);
-      setError("Nie udało się pobrać danych wojskowych.");
-      setData(null);
-    } finally {
-      setLoading(false); // Ukrywamy loader (TODO)
-    }
+    } catch (e) { console.error("Błąd ładowania"); }
+    finally { setLoading(false); }
+  };
+
+  // Pobieranie wszystkich warstw naraz (Zadanie 3)
+  const fetchAllData = async () => {
+    setLoading(true); setData(null);
+    setMilitaryType("all");
+    try {
+      const promises = MILITARY_TYPES.map(type => fetch(`/data/${type}.json`).then(res => res.json()));
+      const results = await Promise.all(promises);
+      setAllData(results);
+    } catch (e) { console.error("Błąd ładowania wszystkich"); }
+    finally { setLoading(false); }
   };
 
   useEffect(() => {
-    fetchData(militaryType);
+    if (militaryType !== "all") fetchData(militaryType);
   }, [militaryType]);
 
-  // ---- DOPASOWANIE WIDOKU ----
+  // Automatyczne dopasowanie widoku
   useEffect(() => {
     if (!data || !layerRef.current) return;
     const bounds = layerRef.current.getBounds();
-    if (bounds.isValid()) {
-      map.fitBounds(bounds, { animate: true, padding: [20, 20] });
-    }
+    if (bounds.isValid()) map.fitBounds(bounds, { animate: true, padding: [20, 20] });
   }, [data, map]);
 
   return (
     <>
-      {/* ---- LOADER ---- */}
-      {loading && (
-        <div style={{
-          position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
-          background: "rgba(0,0,0,0.6)", zIndex: 99999, display: "flex",
-          flexDirection: "column", alignItems: "center", justifyContent: "center",
-          color: "white", fontSize: "24px", fontWeight: "bold"
-        }}>
-          <div>Ładowanie danych: {MILITARY_LABELS[militaryType]}...</div>
-          <div style={{ fontSize: "14px", marginTop: "10px" }}>To może potrwać kilka sekund</div>
-        </div>
-      )}
+      {/* Górny panel z przyciskami (Zadanie 3 i 4) */}
+      <ControlPanel 
+        types={MILITARY_TYPES}
+        labels={MILITARY_LABELS}
+        activeType={militaryType}
+        activeColor={geoStyle.color}
+        onSelect={(t) => setMilitaryType(t)}
+        onShowAll={fetchAllData}
+      />
 
-      {/* ---- KOMUNIKAT BŁĘDU ---- */}
-      {error && (
-        <div style={{
-          position: "absolute", bottom: "40px", left: "50%", transform: "translateX(-50%)",
-          zIndex: 10000, background: "#ff5252", color: "white", padding: "10px 20px", borderRadius: "20px"
-        }}>
-          {error}
-        </div>
-      )}
-
-      {/* ---- PANEL PRZYCISKÓW ---- */}
-      <div style={{
-        position: "absolute", top: "20px", left: "60px", // Przesunięte, by nie zasłaniać zoomu (TODO)
-        zIndex: 9999, background: "rgba(255,255,255,0.9)", padding: "12px",
-        borderRadius: "8px", boxShadow: "0 2px 10px rgba(0,0,0,0.3)", maxWidth: "300px"
-      }}>
-        <div style={{ fontWeight: "bold", marginBottom: "8px", color: "#333" }}>
-          Wywiad geograficzny (OSM):
-        </div>
-        {MILITARY_TYPES.map((type) => (
-          <button
-            key={type}
-            title={`Pobierz obiekty typu: ${type}`} // Tooltip (TODO)
-            onClick={() => setMilitaryType(type)}
-            style={{
-              margin: "3px", padding: "8px 12px", borderRadius: "4px",
-              border: "none", cursor: "pointer", fontSize: "12px",
-              background: type === militaryType ? "#1b5e20" : "#e0e0e0",
-              color: type === militaryType ? "#fff" : "#000",
-              transition: "0.3s"
-            }}
-          >
-            {MILITARY_LABELS[type] || type}
-          </button>
-        ))}
-      </div>
-
-      {/* ---- WARSTWA GEOJSON ---- */}
-      {data && (
-        <GeoJSON
-          key={militaryType}
-          data={data}
+      {/* Warstwy GeoJSON zintegrowane ze stylem (Zadanie 2) */}
+      {militaryType === "all" ? (
+        allData.map((layer, idx) => (
+          <GeoJSON 
+            key={`all-${idx}-${geoStyle.color}-${geoStyle.weight}`} 
+            data={layer} 
+            style={() => ({
+              color: geoStyle.color,
+              weight: geoStyle.weight,
+              opacity: geoStyle.opacity,
+              fillColor: geoStyle.color,
+              fillOpacity: geoStyle.opacity * 0.3
+            })} 
+          />
+        ))
+      ) : (
+        data && <GeoJSON 
+          key={`${militaryType}-${geoStyle.color}-${geoStyle.weight}`} 
+          data={data} 
           ref={layerRef}
           style={() => ({
-            color: "#c62828", // Ciemna czerwień wojskowa
-            weight: 3,
-            opacity: 0.8,
-            fillColor: "#ff5252",
-            fillOpacity: 0.35,
-          })}
-          onEachFeature={(feature, layer) => {
-            // Dodajemy popup z informacją o nazwie obiektu
-            if (feature.properties && feature.properties.name) {
-              layer.bindPopup(`<strong>${feature.properties.name}</strong><br/>Typ: ${militaryType}`);
-            }
-          }}
+            color: geoStyle.color,
+            weight: geoStyle.weight,
+            opacity: geoStyle.opacity,
+            fillColor: geoStyle.color,
+            fillOpacity: geoStyle.opacity * 0.3
+          })} 
         />
       )}
+
+      {/* Legenda (Zadanie 1) */}
+      <Legend 
+        label={militaryType === "all" ? "Wszystkie" : MILITARY_LABELS[militaryType as MilitaryType]} 
+        count={militaryType === "all" 
+          ? allData.reduce((acc, curr) => acc + (curr.features?.length || 0), 0) 
+          : (data?.features?.length || 0)} 
+      />
+
+      {/* Edytor stylu (Zadanie 2) */}
+      <StyleEditor 
+        color={geoStyle.color}
+        weight={geoStyle.weight}
+        opacity={geoStyle.opacity}
+        onChange={(newVal) => setGeoStyle(prev => ({ ...prev, ...newVal }))} 
+      />
     </>
   );
 }

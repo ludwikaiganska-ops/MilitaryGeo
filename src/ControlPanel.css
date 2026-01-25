@@ -1,0 +1,27 @@
+.top-panel {
+  position: absolute;
+  top: 20px;
+  left: 60px;
+  z-index: 999;
+  background: white;
+  padding: 15px;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+  /* Pozwalamy panelowi być tak szerokim, jak wymagają tego przyciski w rzędzie */
+  max-width: calc(100vw - 120px); 
+}
+
+.panel-title {
+  font-weight: bold;
+  margin-bottom: 10px;
+  color: #333;
+  font-size: 14px;
+}
+
+.buttons-container {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
